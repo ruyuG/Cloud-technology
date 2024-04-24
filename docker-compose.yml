@@ -1,0 +1,59 @@
+version: '3.8'
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - hzz-net
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  preprocess:
+    image: 192.168.56.101:5000/get_file:latest
+    depends_on:
+      - rabbitmq
+    networks:
+      - hzz-net
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  process:
+    image: 192.168.56.101:5000/process:latest
+    depends_on:
+      - rabbitmq
+      - preprocess
+    networks:
+      - hzz-net
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 10s
+
+  plot:
+    image: 192.168.56.101:5000/plot:latest
+    volumes:
+      - ./data:/data
+    depends_on:
+      - process
+    networks:
+      - hzz-net
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 100s
+
+networks:
+  hzz-net:
+    driver: overlay
+
